@@ -73,10 +73,10 @@ export default function CalendarioPage() {
               {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
             </CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={prevMonth}>
+              <Button variant="secondary" size="sm" onClick={prevMonth}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={nextMonth}>
+              <Button variant="secondary" size="sm" onClick={nextMonth}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
