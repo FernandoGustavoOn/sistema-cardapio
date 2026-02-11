@@ -10,13 +10,6 @@ import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Plus } from 'lucide-rea
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, getDay, startOfWeek, endOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-export function generateStaticParams() {
-  // Retorna IDs estáticos para build
-  return [
-    { id: '1' },
-    { id: '2' }
-  ]
-}
 
 export default function CalendarioPage() {
   const router = useRouter()

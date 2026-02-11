@@ -12,26 +12,6 @@ import { ArrowLeft, Save, Trash2, Users } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-export function generateStaticParams() {
-  // Gera algumas datas estáticas para exemplo
-  const datas = []
-  const hoje = new Date()
-  
-  for (let i = 0; i < 30; i++) {
-    const data = new Date(hoje)
-    data.setDate(data.getDate() + i)
-    datas.push({
-      id: '1',
-      data: data.toISOString().split('T')[0]
-    })
-    datas.push({
-      id: '2', 
-      data: data.toISOString().split('T')[0]
-    })
-  }
-  
-  return datas
-}
 
 export default function CardapioDiaPage() {
   const router = useRouter()
