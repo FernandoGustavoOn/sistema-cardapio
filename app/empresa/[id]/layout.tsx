@@ -1,7 +1,7 @@
 export function generateStaticParams() {
   return [
-    { empresaId: '1' },
-    { empresaId: '2' }
+    { id: '1' },
+    { id: '2' }
   ]
 }
 
