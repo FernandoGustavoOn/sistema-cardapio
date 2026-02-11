@@ -11,6 +11,13 @@ import { ArrowLeft, Download, FileText } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+export function generateStaticParams() {
+  return [
+    { empresaId: '1' },
+    { empresaId: '2' }
+  ]
+}
+
 export default function RelatorioPage() {
   const router = useRouter()
   const params = useParams()
