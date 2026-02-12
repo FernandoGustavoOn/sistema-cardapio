@@ -25,7 +25,6 @@ import { ptBR } from 'date-fns/locale'
 export default function CalendarioPage() {
   const router = useRouter()
   const params = useParams()
-
   const empresaId = String(params.id)
 
   const [empresas, setEmpresas, empresasReady] = useLocalStorage<Empresa[]>(
@@ -35,13 +34,12 @@ export default function CalendarioPage() {
 
   const [currentDate, setCurrentDate] = useState(new Date())
 
-  //  auth
+  // ✅ Hooks SEMPRE no topo
   useEffect(() => {
     const auth = localStorage.getItem('auth')
     if (!auth) router.push('/')
   }, [router])
 
-  // hooks sempre no topo
   const handleDiaClick = useCallback(
     (day: Date) => {
       const dataStr = format(day, 'yyyy-MM-dd')
@@ -54,7 +52,13 @@ export default function CalendarioPage() {
     router.push(`/relatorio/${empresaId}`)
   }, [router, empresaId])
 
-  // espera localStorage carregar
+  // ✅ useMemo precisa ficar ANTES de qualquer return
+  const empresa = useMemo(
+    () => empresas.find((e) => String(e.id) === empresaId),
+    [empresas, empresaId]
+  )
+
+  // ✅ Agora sim: returns condicionais
   if (!empresasReady) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -62,11 +66,6 @@ export default function CalendarioPage() {
       </div>
     )
   }
-
-  const empresa = useMemo(
-    () => empresas.find((e) => String(e.id) === empresaId),
-    [empresas, empresaId]
-  )
 
   if (!empresa) {
     return (
