@@ -26,8 +26,17 @@ export default function CalendarioPage() {
     }
   }, [router])
 
-  if (!empresa) {
-    return <div>Empresa não encontrada</div>
+    if (!empresa) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Empresa não encontrada</h1>
+          <Button onClick={() => router.push('/dashboard')}>
+            Voltar para Dashboard
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   const monthStart = startOfMonth(currentDate)

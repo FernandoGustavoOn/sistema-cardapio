@@ -12,13 +12,16 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T 
         const item = window.localStorage.getItem(key)
         if (item) {
           setStoredValue(JSON.parse(item))
+        } else {
+          // Se não existe no localStorage, usa o valor inicial
+          window.localStorage.setItem(key, JSON.stringify(initialValue))
         }
       } catch (error) {
         console.error(error)
       }
       setIsInitialized(true)
     }
-  }, [key])
+  }, [key, initialValue])
 
   const setValue = (value: T | ((prev: T) => T)) => {
     try {
