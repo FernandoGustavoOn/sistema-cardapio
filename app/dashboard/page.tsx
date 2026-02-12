@@ -26,16 +26,22 @@ export default function DashboardPage() {
   }
 
   const adicionarEmpresa = () => {
-    const nome = prompt('Nome da nova empresa:')
-    if (nome) {
-      const novaEmpresa: Empresa = {
-        id: Date.now().toString(),
-        nome,
-        dias: []
-      }
-      setEmpresas([...empresas, novaEmpresa])
+  const nome = prompt('Nome da nova empresa:')
+  if (nome) {
+    // Encontra o próximo ID sequencial
+    const maxId = empresas.reduce((max, e) => {
+      const idNum = parseInt(e.id)
+      return idNum > max ? idNum : max
+    }, 0)
+    
+    const novaEmpresa: Empresa = {
+      id: (maxId + 1).toString(),  // ← ID sequencial: 1, 2, 3...
+      nome,
+      dias: []
     }
+    setEmpresas([...empresas, novaEmpresa])
   }
+}
 
   return (
     <div className="min-h-screen bg-gray-50">
