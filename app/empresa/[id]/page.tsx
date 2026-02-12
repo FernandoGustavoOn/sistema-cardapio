@@ -1,22 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
 import { Empresa, DiaCardapio } from '@/lib/types'
+import { empresasIniciais } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Plus } from 'lucide-react'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, getDay, startOfWeek, endOfWeek } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-
 
 export default function CalendarioPage() {
   const router = useRouter()
   const params = useParams()
-  const [empresas, setEmpresas] = useLocalStorage<Empresa[]>('empresas', [])
+  const [empresas, setEmpresas] = useLocalStorage<Empresa[]>('empresas', empresasIniciais)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [isClient, setIsClient] = useState(false)
   
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   const empresa = empresas.find(e => e.id === params.id)
 
   useEffect(() => {
@@ -26,7 +31,11 @@ export default function CalendarioPage() {
     }
   }, [router])
 
-    if (!empresa) {
+  if (!isClient) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Carregando...</div>
+  }
+
+  if (!empresa) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -55,6 +64,15 @@ export default function CalendarioPage() {
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1))
 
+  const handleDiaClick = useCallback((day: Date) => {
+    const dataStr = format(day, 'yyyy-MM-dd')
+    router.push(`/empresa/${params.id}/cardapio/${dataStr}`)
+  }, [router, params.id])
+
+  const handleRelatorioClick = useCallback(() => {
+    router.push(`/relatorio/${params.id}`)
+  }, [router, params.id])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -69,7 +87,7 @@ export default function CalendarioPage() {
               <p className="text-sm text-gray-500">Planejamento Mensal</p>
             </div>
           </div>
-          <Button onClick={() => router.push(`/relatorio/${empresa.id}`)} variant="secondary">
+          <Button onClick={handleRelatorioClick} variant="secondary">
             <FileText className="w-4 h-4 mr-2" />
             Relatório Mensal
           </Button>
@@ -107,11 +125,12 @@ export default function CalendarioPage() {
                 const hasCardapio = !!diaCardapio
 
                 return (
-                  <div
+                  <button
                     key={idx}
-                    onClick={() => router.push(`/empresa/${empresa.id}/cardapio/${format(day, 'yyyy-MM-dd')}`)}
+                    type="button"
+                    onClick={() => handleDiaClick(day)}
                     className={`
-                      min-h-[100px] p-2 rounded-lg border cursor-pointer transition-all hover:shadow-md
+                      min-h-[100px] p-2 rounded-lg border text-left transition-all hover:shadow-md
                       ${isCurrentMonth ? 'bg-white' : 'bg-gray-50 text-gray-400'}
                       ${isTodayDate ? 'ring-2 ring-primary-500' : ''}
                       ${hasCardapio ? 'border-primary-300 bg-primary-50' : 'border-gray-200'}
@@ -140,7 +159,7 @@ export default function CalendarioPage() {
                         <Plus className="w-4 h-4 text-gray-300" />
                       </div>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
