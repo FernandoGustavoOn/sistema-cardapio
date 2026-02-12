@@ -1,39 +1,47 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
-export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((prev: T) => T)) => void] {
+type SetValue<T> = (value: T | ((prev: T) => T)) => void
+
+/**
+ * useLocalStorage
+ * - Lê e escreve no localStorage
+ * - Retorna: [value, setValue, isInitialized]
+ * - isInitialized = true quando já carregou do localStorage (evita "tela branca")
+ */
+export function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>, boolean] {
   const [storedValue, setStoredValue] = useState<T>(initialValue)
   const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const item = window.localStorage.getItem(key)
-        if (item) {
-          setStoredValue(JSON.parse(item))
-        } else {
-          // Se não existe no localStorage, usa o valor inicial
-          window.localStorage.setItem(key, JSON.stringify(initialValue))
-        }
-      } catch (error) {
-        console.error(error)
+    try {
+      const item = window.localStorage.getItem(key)
+
+      if (item !== null) {
+        setStoredValue(JSON.parse(item) as T)
+      } else {
+        window.localStorage.setItem(key, JSON.stringify(initialValue))
+        setStoredValue(initialValue)
       }
+    } catch (error) {
+      console.error(`[useLocalStorage] erro ao ler key="${key}":`, error)
+      setStoredValue(initialValue)
+    } finally {
       setIsInitialized(true)
     }
-  }, [key, initialValue])
+    // não coloque initialValue como dependência, pra não re-inicializar
+  }, [key])
 
-  const setValue = (value: T | ((prev: T) => T)) => {
+  const setValue: SetValue<T> = (value) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value
       setStoredValue(valueToStore)
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore))
-      }
+      window.localStorage.setItem(key, JSON.stringify(valueToStore))
     } catch (error) {
-      console.error(error)
+      console.error(`[useLocalStorage] erro ao salvar key="${key}":`, error)
     }
   }
 
-  return [storedValue, setValue]
+  return [storedValue, setValue, isInitialized]
 }
