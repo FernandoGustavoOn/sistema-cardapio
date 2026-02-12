@@ -1,8 +1,8 @@
 export function generateStaticParams() {
-  return [
-    { empresaId: '1' },
-    { empresaId: '2' }
-  ]
+  // Gera IDs de 1 a 100
+  return Array.from({ length: 100 }, (_, i) => ({
+    empresaId: (i + 1).toString()
+  }))
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -2,17 +2,28 @@ export function generateStaticParams() {
   const datas = []
   const hoje = new Date()
   
-  for (let i = 0; i < 30; i++) {
+  // Gera 30 dias no passado
+  for (let i = 30; i > 0; i--) {
+    const data = new Date(hoje)
+    data.setDate(data.getDate() - i)
+    for (let id = 1; id <= 100; id++) {
+      datas.push({
+        id: id.toString(),
+        data: data.toISOString().split('T')[0]
+      })
+    }
+  }
+  
+  // Gera 60 dias no futuro
+  for (let i = 0; i < 60; i++) {
     const data = new Date(hoje)
     data.setDate(data.getDate() + i)
-    datas.push({
-      id: '1',
-      data: data.toISOString().split('T')[0]
-    })
-    datas.push({
-      id: '2', 
-      data: data.toISOString().split('T')[0]
-    })
+    for (let id = 1; id <= 100; id++) {
+      datas.push({
+        id: id.toString(),
+        data: data.toISOString().split('T')[0]
+      })
+    }
   }
   
   return datas
