@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
-import { Empresa, Alimento, DiaCardapio, ItemCardapio } from '@/lib/types'
-import { empresasIniciais, alimentosIniciais } from '@/lib/data'
+import { Empresa, Alimento, DiaCardapio, ItemCardapio, Receita } from '@/lib/types'
+import { empresasIniciais, alimentosIniciais, receitasIniciais } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Save, Trash2, Users } from 'lucide-react'
+import Modal from '@/components/ui/modal'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -25,6 +26,7 @@ export default function CardapioDiaPage() {
     empresasIniciais
   )
   const [alimentos] = useLocalStorage<Alimento[]>('alimentos', alimentosIniciais)
+  const [receitas] = useLocalStorage<Receita[]>('receitas', receitasIniciais)
 
   // auth
   useEffect(() => {
@@ -43,13 +45,15 @@ export default function CardapioDiaPage() {
   )
 
   const [numeroPessoas, setNumeroPessoas] = useState(10)
-  const [itensSelecionados, setItensSelecionados] = useState<string[]>([])
+  const [itensSelecionados, setItensSelecionados] = useState<ItemCardapio[]>([])
+  const [modalReceita, setModalReceita] = useState<Receita | null>(null)
+  const [modalPessoas, setModalPessoas] = useState<number>(10)
 
   // ✅ Quando o storage carregar / dia mudar, sincroniza o estado
   useEffect(() => {
     if (!empresasReady || !empresa) return
     setNumeroPessoas(diaExistente?.numeroPessoas ?? 10)
-    setItensSelecionados(diaExistente?.itens.map((i) => i.alimentoId) ?? [])
+    setItensSelecionados(diaExistente?.itens ?? [])
   }, [empresasReady, empresaId, empresa, dataStr, diaExistente?.numeroPessoas])
 
   if (!empresasReady) {
@@ -62,41 +66,44 @@ export default function CardapioDiaPage() {
 
   if (!empresa) return <div>Empresa não encontrada</div>
 
-  const toggleAlimento = (alimentoId: string) => {
-    setItensSelecionados((prev) =>
-      prev.includes(alimentoId) ? prev.filter((id) => id !== alimentoId) : [...prev, alimentoId]
-    )
+  const abrirModalReceita = (r: Receita) => {
+    setModalReceita(r)
+    setModalPessoas(numeroPessoas)
   }
 
-  const calcularQuantidade = (alimento: Alimento): number => {
-    if (!alimento.proporcional) return alimento.quantidadePorPessoa
-
-    // tempero proporcional ao alimento base
-    if (alimento.alimentoBaseId && alimento.fatorProporcao) {
-      const alimentoBase = alimentos.find((a) => a.id === alimento.alimentoBaseId)
-      if (alimentoBase) {
-        const qtdBase = alimentoBase.quantidadePorPessoa * numeroPessoas
-        return qtdBase * alimento.fatorProporcao
+  const confirmarModal = () => {
+    if (!modalReceita) return
+    setItensSelecionados((prev) => {
+      const exists = prev.find((p) => p.receitaId === modalReceita.id)
+      if (exists) {
+        return prev.map((p) => p.receitaId === modalReceita.id ? { ...p, quantidadePessoas: modalPessoas } : p)
       }
-    }
+      return [...prev, { receitaId: modalReceita.id, quantidadePessoas: modalPessoas, receita: modalReceita }]
+    })
+    setModalReceita(null)
+  }
 
-    return alimento.quantidadePorPessoa * numeroPessoas
+  const removerReceitaSelecionada = (receitaId: string) => {
+    setItensSelecionados((prev) => prev.filter(p => p.receitaId !== receitaId))
+  }
+
+  const calcularQuantidadeIngrediente = (ingrediente: any, pessoas: number, receita: Receita) => {
+    // quantidade = ingrediente.quantidadePorPessoa * (pessoas / receita.rendimento)
+    return ingrediente.quantidadePorPessoa * (pessoas / receita.rendimento)
   }
 
   const formatarQuantidade = (quantidade: number, unidade: string): string => {
+    if (unidade === 'g' || unidade === 'ml') return `${quantidade.toFixed(0)} ${unidade}`
     if (quantidade >= 1) return `${quantidade.toFixed(2)} ${unidade}`
     return `${(quantidade * 1000).toFixed(0)} g`
   }
 
   const salvarCardapio = () => {
-    const novosItens: ItemCardapio[] = itensSelecionados.map((id) => {
-      const alimento = alimentos.find((a) => a.id === id)!
-      return {
-        alimentoId: id,
-        quantidade: calcularQuantidade(alimento),
-        alimento,
-      }
-    })
+    const novosItens: ItemCardapio[] = itensSelecionados.map((it) => ({
+      receitaId: it.receitaId,
+      quantidadePessoas: it.quantidadePessoas,
+      receita: receitas.find(r => r.id === it.receitaId)
+    }))
 
     const novoDia: DiaCardapio = {
       data: dataStr,
@@ -197,33 +204,32 @@ export default function CardapioDiaPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {categorias.map((cat) => {
-              const alimentosCat = alimentos.filter((a) => a.categoria === cat.id)
-              if (alimentosCat.length === 0) return null
+            {['principal','acompanhamento','salada','sobremesa'].map((cat) => {
+              const receitasCat = receitas.filter((r) => r.categoria === (cat as any))
+              if (receitasCat.length === 0) return null
 
               return (
-                <Card key={cat.id}>
+                <Card key={cat}>
                   <CardHeader>
-                    <CardTitle className="text-lg">{cat.nome}</CardTitle>
+                    <CardTitle className="text-lg">{cat}</CardTitle>
                   </CardHeader>
 
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {alimentosCat.map((alimento) => {
-                        const selecionado = itensSelecionados.includes(alimento.id)
-                        const quantidade = calcularQuantidade(alimento)
+                      {receitasCat.map((receita) => {
+                        const selecionado = itensSelecionados.some(i => i.receitaId === receita.id)
 
                         return (
                           <div
-                            key={alimento.id}
-                            onClick={() => toggleAlimento(alimento.id)}
+                            key={receita.id}
+                            onClick={() => abrirModalReceita(receita)}
                             className={`
                               p-4 rounded-lg border-2 cursor-pointer transition-all
                               ${selecionado ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}
                             `}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{alimento.nome}</span>
+                              <span className="font-medium">{receita.nome}</span>
 
                               {selecionado && (
                                 <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
@@ -236,7 +242,7 @@ export default function CardapioDiaPage() {
 
                             {selecionado && (
                               <p className="text-sm text-primary-700 mt-1 font-medium">
-                                {formatarQuantidade(quantidade, alimento.unidade)}
+                                {`Rende ${receita.rendimento} • ${receita.ingredientes.length} ingredientes`}
                               </p>
                             )}
                           </div>
@@ -263,25 +269,29 @@ export default function CardapioDiaPage() {
                   </div>
 
                   {itensSelecionados.length === 0 ? (
-                    <p className="text-gray-400 text-center py-4">Nenhum item selecionado</p>
+                    <p className="text-gray-400 text-center py-4">Nenhuma receita selecionada</p>
                   ) : (
                     <div className="space-y-2">
-                      {itensSelecionados.map((id) => {
-                        const alimento = alimentos.find((a) => a.id === id)!
-                        const quantidade = calcularQuantidade(alimento)
+                      {itensSelecionados.map((item) => {
+                        const receita = receitas.find(r => r.id === item.receitaId)!
 
                         return (
-                          <div key={id} className="flex justify-between items-center py-2">
-                            <span className="text-sm">{alimento.nome}</span>
-                            <span className="text-sm font-medium text-gray-700">
-                              {formatarQuantidade(quantidade, alimento.unidade)}
-                            </span>
+                          <div key={item.receitaId} className="flex justify-between items-center py-2">
+                            <div>
+                              <span className="text-sm font-medium">{receita.nome}</span>
+                              <div className="text-xs text-gray-500">{item.quantidadePessoas} pessoas</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => removerReceitaSelecionada(item.receitaId)}>
+                                Remover
+                              </Button>
+                            </div>
                           </div>
                         )
                       })}
+
                     </div>
                   )}
-
                   <div className="pt-4 border-t">
                     <p className="text-sm text-gray-500">{itensSelecionados.length} itens selecionados</p>
                   </div>
@@ -290,6 +300,19 @@ export default function CardapioDiaPage() {
             </Card>
           </div>
         </div>
+        {modalReceita && (
+          <Modal onClose={() => setModalReceita(null)}>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">{modalReceita.nome}</h3>
+              <p className="text-sm text-gray-600 mb-4">Quantas pessoas?</p>
+              <Input type="number" value={modalPessoas} onChange={e => setModalPessoas(parseInt(e.target.value || '0'))} />
+              <div className="flex gap-2 mt-4 justify-end">
+                <Button variant="ghost" onClick={() => setModalReceita(null)}>Cancelar</Button>
+                <Button onClick={confirmarModal}>Confirmar</Button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </main>
     </div>
   )

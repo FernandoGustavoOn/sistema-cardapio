@@ -1,4 +1,4 @@
-import { Alimento, Empresa, Usuario } from './types'
+import { Alimento, Empresa, Usuario, Receita } from './types'
 
 export const usuarioAdmin: Usuario = {
   username: 'admin',
@@ -49,5 +49,42 @@ export const empresasIniciais: Empresa[] = [
     id: '2',
     nome: 'Indústria XYZ',
     dias: []
+  }
+]
+
+export const receitasIniciais: Receita[] = [
+  {
+    id: 'r1',
+    nome: 'Arroz Branco',
+    categoria: 'principal',
+    rendimento: 10,
+    ingredientes: [
+      { alimentoId: '1', quantidadePorPessoa: 0.08 },
+      { alimentoId: '17', quantidadePorPessoa: 0.01 },
+      { alimentoId: '15', quantidadePorPessoa: 0.002 },
+      { alimentoId: '14', quantidadePorPessoa: 0.005 }
+    ]
+  },
+  {
+    id: 'r2',
+    nome: 'Feijão Carioca',
+    categoria: 'acompanhamento',
+    rendimento: 10,
+    ingredientes: [
+      { alimentoId: '2', quantidadePorPessoa: 0.04 },
+      { alimentoId: '17', quantidadePorPessoa: 0.005 },
+      { alimentoId: '15', quantidadePorPessoa: 0.002 }
+    ]
+  },
+  {
+    id: 'r3',
+    nome: 'Carne Moída Refogada',
+    categoria: 'principal',
+    rendimento: 10,
+    ingredientes: [
+      { alimentoId: '5', quantidadePorPessoa: 0.12 },
+      { alimentoId: '16', quantidadePorPessoa: 0.02 },
+      { alimentoId: '14', quantidadePorPessoa: 0.003 }
+    ]
   }
 ]

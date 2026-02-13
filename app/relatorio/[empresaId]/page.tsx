@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
-import { Empresa, Alimento } from '@/lib/types'
-import { alimentosIniciais } from '@/lib/data'
+import { Empresa, Alimento, Receita } from '@/lib/types'
+import { alimentosIniciais, receitasIniciais } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Download, FileText } from 'lucide-react'
@@ -17,6 +17,7 @@ export default function RelatorioPage() {
   const params = useParams()
   const [empresas] = useLocalStorage<Empresa[]>('empresas', [])
   const [alimentos] = useLocalStorage<Alimento[]>('alimentos', alimentosIniciais)
+  const [receitas] = useLocalStorage<Receita[]>('receitas', receitasIniciais)
   const relatorioRef = useRef<HTMLDivElement>(null)
   
   const empresa = empresas.find(e => e.id === params.empresaId)
@@ -28,23 +29,26 @@ export default function RelatorioPage() {
 
   if (!empresa) return <div>Empresa não encontrada</div>
 
-  // Calcula totais
+  // Calcula totais a partir de receitas e ingredientes
   const totais: Record<string, { nome: string; quantidade: number; unidade: string; categoria: string }> = {}
 
   empresa.dias.forEach(dia => {
     dia.itens.forEach(item => {
-      const alimento = alimentos.find(a => a.id === item.alimentoId)
-      if (alimento) {
-        if (!totais[alimento.id]) {
-          totais[alimento.id] = {
-            nome: alimento.nome,
-            quantidade: 0,
-            unidade: alimento.unidade,
-            categoria: alimento.categoria
-          }
+      const receita = receitas.find(r => r.id === item.receitaId)
+      if (!receita) return
+      const pessoas = item.quantidadePessoas
+      receita.ingredientes.forEach(ing => {
+        const alimento = alimentos.find(a => a.id === ing.alimentoId)
+        const unidade = alimento?.unidade || 'kg'
+        const nome = alimento?.nome || ing.alimentoId
+        const categoria = alimento?.categoria || 'outro'
+        const qtd = ing.quantidadePorPessoa * (pessoas / receita.rendimento)
+
+        if (!totais[ing.alimentoId]) {
+          totais[ing.alimentoId] = { nome, quantidade: 0, unidade, categoria }
         }
-        totais[alimento.id].quantidade += item.quantidade
-      }
+        totais[ing.alimentoId].quantidade += qtd
+      })
     })
   })
 
@@ -68,25 +72,33 @@ export default function RelatorioPage() {
   }
 
   const gerarPDF = () => {
-    const conteudo = `
-      RELATÓRIO DE PLANEJAMENTO - ${empresa.nome.toUpperCase()}
-      
-      Período: ${empresa.dias.length} dias planejados
-      
-      RESUMO CONSOLIDADO:
-      ${Object.values(totais).map(item => 
-        `- ${item.nome}: ${formatarQuantidade(item.quantidade, item.unidade)}`
-      ).join('\n')}
-      
-      DETALHAMENTO POR DIA:
-      ${empresa.dias.map(dia => {
-        const data = parseISO(dia.data)
-        return `
-${format(data, 'dd/MM/yyyy')} - ${dia.numeroPessoas} pessoas:
-${dia.itens.map(i => `  • ${i.alimento?.nome}: ${formatarQuantidade(i.quantidade, i.alimento?.unidade || 'kg')}`).join('\n')}
-        `
-      }).join('\n')}
-    `
+    const lines: string[] = []
+    lines.push(`RELATÓRIO DE PLANEJAMENTO - ${empresa.nome.toUpperCase()}`)
+    lines.push('')
+    lines.push(`Período: ${empresa.dias.length} dias planejados`)
+    lines.push('')
+    lines.push('RESUMO CONSOLIDADO:')
+    Object.values(totais).forEach(item => {
+      lines.push(`- ${item.nome}: ${formatarQuantidade(item.quantidade, item.unidade)}`)
+    })
+    lines.push('')
+    lines.push('DETALHAMENTO POR DIA:')
+    empresa.dias.forEach(dia => {
+      const data = parseISO(dia.data)
+      lines.push('')
+      lines.push(`${format(data, 'dd/MM/yyyy')} - ${dia.numeroPessoas} pessoas:`)
+      dia.itens.forEach(i => {
+        const receita = receitas.find(r => r.id === i.receitaId)
+        lines.push(`  ${receita?.nome || i.receitaId} • ${i.quantidadePessoas} pessoas`)
+        receita?.ingredientes.forEach(ing => {
+          const alimento = alimentos.find(a => a.id === ing.alimentoId)
+          const qtd = ing.quantidadePorPessoa * (i.quantidadePessoas / (receita?.rendimento || 1))
+          lines.push(`    • ${alimento?.nome || ing.alimentoId}: ${formatarQuantidade(qtd, alimento?.unidade || 'kg')}`)
+        })
+      })
+    })
+
+    const conteudo = lines.join('\n')
 
     const blob = new Blob([conteudo], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -188,14 +200,26 @@ ${dia.itens.map(i => `  • ${i.alimento?.nome}: ${formatarQuantidade(i.quantida
                           </span>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                          {dia.itens.map((item, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span className="text-gray-600">{item.alimento?.nome}</span>
-                              <span className="font-medium text-gray-900">
-                                {formatarQuantidade(item.quantidade, item.alimento?.unidade || 'kg')}
-                              </span>
-                            </div>
-                          ))}
+                          {dia.itens.map((item, idx) => {
+                            const receita = receitas.find(r => r.id === item.receitaId)
+                            return (
+                              <div key={idx} className="flex flex-col w-full mb-2">
+                                <div className="font-medium">{receita?.nome} • {item.quantidadePessoas} pessoas</div>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  {receita?.ingredientes.map((ing, i) => {
+                                    const alimento = alimentos.find(a => a.id === ing.alimentoId)
+                                    const qtd = ing.quantidadePorPessoa * (item.quantidadePessoas / (receita?.rendimento || 1))
+                                    return (
+                                      <div key={i} className="flex justify-between">
+                                        <span className="text-gray-600">{alimento?.nome || ing.alimentoId}</span>
+                                        <span className="font-medium text-gray-900">{formatarQuantidade(qtd, alimento?.unidade || 'kg')}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )

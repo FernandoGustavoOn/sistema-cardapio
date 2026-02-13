@@ -9,10 +9,24 @@ export interface Alimento {
   fatorProporcao?: number // ex: 0.1 = 10% da quantidade do alimento base
 }
 
-export interface ItemCardapio {
+export interface IngredienteReceita {
   alimentoId: string
-  quantidade: number
+  quantidadePorPessoa: number
   alimento?: Alimento
+}
+
+export interface Receita {
+  id: string
+  nome: string
+  categoria: 'principal' | 'acompanhamento' | 'salada' | 'sobremesa'
+  ingredientes: IngredienteReceita[]
+  rendimento: number
+}
+
+export interface ItemCardapio {
+  receitaId: string
+  quantidadePessoas: number
+  receita?: Receita
 }
 
 export interface DiaCardapio {

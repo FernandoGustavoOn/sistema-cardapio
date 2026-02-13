@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
 import { Empresa, DiaCardapio } from '@/lib/types'
-import { empresasIniciais } from '@/lib/data'
+import { empresasIniciais, receitasIniciais } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Plus } from 'lucide-react'
@@ -31,6 +31,7 @@ export default function CalendarioPage() {
     'empresas',
     empresasIniciais
   )
+  const [receitas] = useLocalStorage('receitas', receitasIniciais)
 
   const [currentDate, setCurrentDate] = useState(new Date())
 
@@ -109,10 +110,15 @@ export default function CalendarioPage() {
             </div>
           </div>
 
-          <Button onClick={handleRelatorioClick} variant="secondary">
-            <FileText className="w-4 h-4 mr-2" />
-            Relatório Mensal
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => router.push(`/empresa/${empresaId}/compras`)} variant="secondary">
+              Lista de Compras
+            </Button>
+            <Button onClick={handleRelatorioClick} variant="secondary">
+              <FileText className="w-4 h-4 mr-2" />
+              Relatório Mensal
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -172,7 +178,10 @@ export default function CalendarioPage() {
                     {hasCardapio && (
                       <div className="mt-1">
                         <p className="text-xs text-gray-600 font-medium">{diaCardapio.numeroPessoas} pessoas</p>
-                        <p className="text-xs text-gray-500 truncate">{diaCardapio.itens.length} itens</p>
+                        <p className="text-xs text-gray-500 truncate">{diaCardapio.itens.length} receitas</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {diaCardapio.itens.map(it => receitas.find(r => r.id === it.receitaId)?.nome || '').filter(Boolean).slice(0,3).join(', ')}
+                        </p>
                       </div>
                     )}
 
