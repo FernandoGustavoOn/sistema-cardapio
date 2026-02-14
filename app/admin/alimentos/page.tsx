@@ -33,9 +33,7 @@ export default function AdminAlimentosPage() {
       categoria: novoAlimento.categoria as any,
       quantidadePorPessoa: novoAlimento.quantidadePorPessoa!,
       unidade: novoAlimento.unidade as any,
-      proporcional: novoAlimento.proporcional ?? true,
-      alimentoBaseId: novoAlimento.alimentoBaseId,
-      fatorProporcao: novoAlimento.fatorProporcao
+      proporcional: novoAlimento.proporcional ?? true
     }
     
     setAlimentos([...alimentos, alimento])
