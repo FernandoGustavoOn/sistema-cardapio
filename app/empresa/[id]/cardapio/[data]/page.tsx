@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
 import { Empresa, Alimento, DiaCardapio, ItemCardapio, Receita } from '@/lib/types'
@@ -21,6 +21,7 @@ export default function CardapioDiaPage() {
   const dataStr = String(params.data)
   const dataDate = parseISO(dataStr)
 
+  // ✅ Todos os hooks primeiro, antes de qualquer return
   const [empresas, setEmpresas, empresasReady] = useLocalStorage<Empresa[]>(
     'empresas',
     empresasIniciais
@@ -28,49 +29,44 @@ export default function CardapioDiaPage() {
   const [alimentos] = useLocalStorage<Alimento[]>('alimentos', alimentosIniciais)
   const [receitas] = useLocalStorage<Receita[]>('receitas', receitasIniciais)
 
-  useEffect(() => {
-    const auth = localStorage.getItem('auth')
-    if (!auth) router.push('/')
-  }, [router])
-
-  const empresa = useMemo(
-    () => empresas.find((e) => String(e.id) === empresaId),
-    [empresas, empresaId]
-  )
-
-  const diaExistente = useMemo(
-    () => empresa?.dias.find((d) => d.data === dataStr),
-    [empresa, dataStr]
-  )
-
   const [numeroPessoas, setNumeroPessoas] = useState(10)
   const [itensSelecionados, setItensSelecionados] = useState<ItemCardapio[]>([])
   const [modalReceita, setModalReceita] = useState<Receita | null>(null)
   const [modalPessoas, setModalPessoas] = useState<number>(10)
 
+  // ✅ useEffect sempre no topo
+  useEffect(() => {
+    const auth = localStorage.getItem('auth')
+    if (!auth) router.push('/')
+  }, [router])
+
+  // ✅ useMemo para encontrar empresa
+  const empresa = useMemo(
+    () => empresas.find((e) => String(e.id) === empresaId),
+    [empresas, empresaId]
+  )
+
+  // ✅ useMemo para encontrar dia existente
+  const diaExistente = useMemo(
+    () => empresa?.dias.find((d) => d.data === dataStr),
+    [empresa, dataStr]
+  )
+
+  // ✅ useEffect para sincronizar estado
   useEffect(() => {
     if (!empresasReady || !empresa) return
     setNumeroPessoas(diaExistente?.numeroPessoas ?? 10)
     setItensSelecionados(diaExistente?.itens ?? [])
-  }, [empresasReady, empresaId, empresa, dataStr, diaExistente])
+  }, [empresasReady, empresa, diaExistente])
 
-  if (!empresasReady) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        Carregando...
-      </div>
-    )
-  }
-
-  if (!empresa) return <div>Empresa não encontrada</div>
-
-  const abrirModalReceita = (r: Receita) => {
+  // ✅ useCallback para funções estáveis
+  const abrirModalReceita = useCallback((r: Receita) => {
     const existente = itensSelecionados.find(i => i.receitaId === r.id)
     setModalReceita(r)
     setModalPessoas(existente?.quantidadePessoas ?? numeroPessoas)
-  }
+  }, [itensSelecionados, numeroPessoas])
 
-  const confirmarModal = () => {
+  const confirmarModal = useCallback(() => {
     if (!modalReceita) return
     setItensSelecionados((prev) => {
       const exists = prev.find((p) => p.receitaId === modalReceita.id)
@@ -86,26 +82,18 @@ export default function CardapioDiaPage() {
       }]
     })
     setModalReceita(null)
-  }
+  }, [modalReceita, modalPessoas])
 
-  const removerReceitaSelecionada = (receitaId: string) => {
+  const removerReceitaSelecionada = useCallback((receitaId: string) => {
     setItensSelecionados((prev) => prev.filter(p => p.receitaId !== receitaId))
-  }
+  }, [])
 
-  // ✅ Cálculo correto: quantidade = qtdPorPessoa × (pessoas / rendimento)
-  const calcularIngrediente = (ing: any, pessoas: number, rendimento: number) => {
-    return ing.quantidadePorPessoa * (pessoas / rendimento)
-  }
-
-  const formatarQuantidade = (qtd: number, unidade: string): string => {
-    if (qtd >= 1) return `${qtd.toFixed(3)} ${unidade}`
-    return `${(qtd * 1000).toFixed(0)} g`
-  }
-
-  // ✅ Agrupa ingredientes de todas as receitas selecionadas
+  // ✅ useMemo para cálculo de ingredientes (dependências estáveis)
   const ingredientesTotais = useMemo(() => {
+    if (!alimentos.length || !receitas.length) return []
+    
     const map: Record<string, { 
-      alimento: any, 
+      alimento: Alimento
       quantidadeTotal: number 
     }> = {}
 
@@ -117,7 +105,7 @@ export default function CardapioDiaPage() {
         const alimento = alimentos.find(a => a.id === ing.alimentoId)
         if (!alimento) return
 
-        const qtd = calcularIngrediente(ing, item.quantidadePessoas, receita.rendimento)
+        const qtd = ing.quantidadePorPessoa * (item.quantidadePessoas / receita.rendimento)
 
         if (!map[alimento.id]) {
           map[alimento.id] = { alimento, quantidadeTotal: 0 }
@@ -132,7 +120,8 @@ export default function CardapioDiaPage() {
     )
   }, [itensSelecionados, receitas, alimentos])
 
-  const salvarCardapio = () => {
+  // ✅ useCallback para salvar
+  const salvarCardapio = useCallback(() => {
     const novoDia: DiaCardapio = {
       data: dataStr,
       numeroPessoas,
@@ -152,9 +141,9 @@ export default function CardapioDiaPage() {
 
     setEmpresas(novasEmpresas)
     router.push(`/empresa/${empresaId}`)
-  }
+  }, [empresas, empresaId, dataStr, numeroPessoas, itensSelecionados, router, setEmpresas])
 
-  const excluirCardapio = () => {
+  const excluirCardapio = useCallback(() => {
     const novasEmpresas = empresas.map((e) => {
       if (String(e.id) === empresaId) {
         return { ...e, dias: e.dias.filter((d) => d.data !== dataStr) }
@@ -164,6 +153,29 @@ export default function CardapioDiaPage() {
 
     setEmpresas(novasEmpresas)
     router.push(`/empresa/${empresaId}`)
+  }, [empresas, empresaId, dataStr, router, setEmpresas])
+
+  // ✅ Agora sim: return condicional DEPOIS de todos os hooks
+  if (!empresasReady) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!empresa) {
+    return <div className="min-h-screen flex items-center justify-center">Empresa não encontrada</div>
+  }
+
+  const formatarQuantidade = (qtd: number, unidade: string): string => {
+    if (unidade === 'g' || unidade === 'ml') {
+      return `${(qtd * 1000).toFixed(0)} ${unidade}`
+    }
+    if (qtd >= 1) {
+      return `${qtd.toFixed(3)} ${unidade}`
+    }
+    return `${(qtd * 1000).toFixed(0)} g`
   }
 
   const categoriasReceita = [
@@ -301,7 +313,6 @@ export default function CardapioDiaPage() {
 
               <CardContent>
                 <div className="space-y-4">
-                  {/* Receitas Selecionadas */}
                   <div>
                     <p className="text-sm text-gray-500 mb-2">Receitas ({itensSelecionados.length})</p>
                     {itensSelecionados.length === 0 ? (
@@ -334,7 +345,6 @@ export default function CardapioDiaPage() {
                     )}
                   </div>
 
-                  {/* Ingredientes Totais */}
                   {ingredientesTotais.length > 0 && (
                     <div className="pt-4 border-t">
                       <p className="text-sm text-gray-500 mb-2">Ingredientes Totais</p>
