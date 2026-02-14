@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocalStorage } from '@/lib/hooks/useStorage'
 import { Empresa, Alimento, Receita } from '@/lib/types'
 import { empresasIniciais, alimentosIniciais, receitasIniciais } from '@/lib/data'
@@ -9,8 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 
-export default function ComprasClient({ empresaId, mes, ano }: { empresaId: string; mes: number; ano: number }) {
+export default function ComprasClient({ empresaId }: { empresaId: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // ✅ Lê mes e ano dos searchParams no cliente
+  const hoje = new Date()
+  const mes = searchParams.get('mes') 
+    ? parseInt(searchParams.get('mes')!) - 1 
+    : hoje.getMonth()
+  const ano = searchParams.get('ano') 
+    ? parseInt(searchParams.get('ano')!) 
+    : hoje.getFullYear()
 
   const [empresas] = useLocalStorage<Empresa[]>('empresas', empresasIniciais)
   const [alimentos] = useLocalStorage<Alimento[]>('alimentos', alimentosIniciais)

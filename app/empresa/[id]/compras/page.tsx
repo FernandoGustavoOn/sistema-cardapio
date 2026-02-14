@@ -1,17 +1,20 @@
+// app/empresa/[id]/compras/page.tsx
+
 import { Suspense } from 'react'
 import ComprasClient from './ComprasClient'
 
-export const dynamic = 'force-dynamic'
+export const dynamicParams = true
 
-export default function ComprasPage({ params, searchParams }: { params: { id: string }, searchParams: { mes?: string, ano?: string } }) {
-  const empresaId = String(params.id)
-  const hoje = new Date()
-  const mes = searchParams?.mes ? parseInt(String(searchParams.mes)) - 1 : hoje.getMonth()
-  const ano = searchParams?.ano ? parseInt(String(searchParams.ano)) : hoje.getFullYear()
+export async function generateStaticParams() {
+  const ids = Array.from({ length: 100 }, (_, i) => String(i + 1))
+  return ids.map((id) => ({ id }))
+}
 
+export default function ComprasPage({ params }: { params: { id: string } }) {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
-      <ComprasClient empresaId={empresaId} mes={mes} ano={ano} />
+      {/* ✅ Só passa empresaId, mes/ano são lidos no cliente */}
+      <ComprasClient empresaId={String(params.id)} />
     </Suspense>
   )
 }
