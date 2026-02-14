@@ -8,7 +8,7 @@ import { empresasIniciais, alimentosIniciais, receitasIniciais } from '@/lib/dat
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Save, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Users, ChefHat } from 'lucide-react'
 import Modal from '@/components/ui/modal'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -28,7 +28,6 @@ export default function CardapioDiaPage() {
   const [alimentos] = useLocalStorage<Alimento[]>('alimentos', alimentosIniciais)
   const [receitas] = useLocalStorage<Receita[]>('receitas', receitasIniciais)
 
-  // auth
   useEffect(() => {
     const auth = localStorage.getItem('auth')
     if (!auth) router.push('/')
@@ -49,12 +48,11 @@ export default function CardapioDiaPage() {
   const [modalReceita, setModalReceita] = useState<Receita | null>(null)
   const [modalPessoas, setModalPessoas] = useState<number>(10)
 
-  // ✅ Quando o storage carregar / dia mudar, sincroniza o estado
   useEffect(() => {
     if (!empresasReady || !empresa) return
     setNumeroPessoas(diaExistente?.numeroPessoas ?? 10)
     setItensSelecionados(diaExistente?.itens ?? [])
-  }, [empresasReady, empresaId, empresa, dataStr, diaExistente?.numeroPessoas])
+  }, [empresasReady, empresaId, empresa, dataStr, diaExistente])
 
   if (!empresasReady) {
     return (
@@ -67,8 +65,9 @@ export default function CardapioDiaPage() {
   if (!empresa) return <div>Empresa não encontrada</div>
 
   const abrirModalReceita = (r: Receita) => {
+    const existente = itensSelecionados.find(i => i.receitaId === r.id)
     setModalReceita(r)
-    setModalPessoas(numeroPessoas)
+    setModalPessoas(existente?.quantidadePessoas ?? numeroPessoas)
   }
 
   const confirmarModal = () => {
@@ -76,9 +75,15 @@ export default function CardapioDiaPage() {
     setItensSelecionados((prev) => {
       const exists = prev.find((p) => p.receitaId === modalReceita.id)
       if (exists) {
-        return prev.map((p) => p.receitaId === modalReceita.id ? { ...p, quantidadePessoas: modalPessoas } : p)
+        return prev.map((p) => p.receitaId === modalReceita.id 
+          ? { ...p, quantidadePessoas: modalPessoas } 
+          : p
+        )
       }
-      return [...prev, { receitaId: modalReceita.id, quantidadePessoas: modalPessoas, receita: modalReceita }]
+      return [...prev, { 
+        receitaId: modalReceita.id, 
+        quantidadePessoas: modalPessoas 
+      }]
     })
     setModalReceita(null)
   }
@@ -87,28 +92,54 @@ export default function CardapioDiaPage() {
     setItensSelecionados((prev) => prev.filter(p => p.receitaId !== receitaId))
   }
 
-  const calcularQuantidadeIngrediente = (ingrediente: any, pessoas: number, receita: Receita) => {
-    // quantidade = ingrediente.quantidadePorPessoa * (pessoas / receita.rendimento)
-    return ingrediente.quantidadePorPessoa * (pessoas / receita.rendimento)
+  // ✅ Cálculo correto: quantidade = qtdPorPessoa × (pessoas / rendimento)
+  const calcularIngrediente = (ing: any, pessoas: number, rendimento: number) => {
+    return ing.quantidadePorPessoa * (pessoas / rendimento)
   }
 
-  const formatarQuantidade = (quantidade: number, unidade: string): string => {
-    if (unidade === 'g' || unidade === 'ml') return `${quantidade.toFixed(0)} ${unidade}`
-    if (quantidade >= 1) return `${quantidade.toFixed(2)} ${unidade}`
-    return `${(quantidade * 1000).toFixed(0)} g`
+  const formatarQuantidade = (qtd: number, unidade: string): string => {
+    if (qtd >= 1) return `${qtd.toFixed(3)} ${unidade}`
+    return `${(qtd * 1000).toFixed(0)} g`
   }
+
+  // ✅ Agrupa ingredientes de todas as receitas selecionadas
+  const ingredientesTotais = useMemo(() => {
+    const map: Record<string, { 
+      alimento: any, 
+      quantidadeTotal: number 
+    }> = {}
+
+    itensSelecionados.forEach(item => {
+      const receita = receitas.find(r => r.id === item.receitaId)
+      if (!receita) return
+
+      receita.ingredientes.forEach(ing => {
+        const alimento = alimentos.find(a => a.id === ing.alimentoId)
+        if (!alimento) return
+
+        const qtd = calcularIngrediente(ing, item.quantidadePessoas, receita.rendimento)
+
+        if (!map[alimento.id]) {
+          map[alimento.id] = { alimento, quantidadeTotal: 0 }
+        }
+        map[alimento.id].quantidadeTotal += qtd
+      })
+    })
+
+    return Object.values(map).sort((a, b) => 
+      a.alimento.categoria.localeCompare(b.alimento.categoria) ||
+      a.alimento.nome.localeCompare(b.alimento.nome)
+    )
+  }, [itensSelecionados, receitas, alimentos])
 
   const salvarCardapio = () => {
-    const novosItens: ItemCardapio[] = itensSelecionados.map((it) => ({
-      receitaId: it.receitaId,
-      quantidadePessoas: it.quantidadePessoas,
-      receita: receitas.find(r => r.id === it.receitaId)
-    }))
-
     const novoDia: DiaCardapio = {
       data: dataStr,
       numeroPessoas,
-      itens: novosItens,
+      itens: itensSelecionados.map(it => ({
+        receitaId: it.receitaId,
+        quantidadePessoas: it.quantidadePessoas
+      })),
     }
 
     const novasEmpresas = empresas.map((e) => {
@@ -135,14 +166,11 @@ export default function CardapioDiaPage() {
     router.push(`/empresa/${empresaId}`)
   }
 
-  const categorias = [
-    { id: 'grao', nome: 'Grãos' },
-    { id: 'carne', nome: 'Carnes' },
+  const categoriasReceita = [
+    { id: 'principal', nome: 'Principais' },
     { id: 'acompanhamento', nome: 'Acompanhamentos' },
-    { id: 'verdura', nome: 'Verduras/Saladas' },
-    { id: 'fruta', nome: 'Frutas' },
-    { id: 'tempero', nome: 'Temperos' },
-    { id: 'outro', nome: 'Outros' },
+    { id: 'salada', nome: 'Saladas' },
+    { id: 'sobremesa', nome: 'Sobremesas' },
   ]
 
   return (
@@ -197,27 +225,27 @@ export default function CardapioDiaPage() {
                 onChange={(e) => setNumeroPessoas(parseInt(e.target.value) || 0)}
                 className="w-32 text-lg"
               />
-              <span className="text-gray-500">pessoas</span>
+              <span className="text-gray-500">pessoas (padrão para novas receitas)</span>
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {['principal','acompanhamento','salada','sobremesa'].map((cat) => {
-              const receitasCat = receitas.filter((r) => r.categoria === (cat as any))
+            {categoriasReceita.map((cat) => {
+              const receitasCat = receitas.filter((r) => r.categoria === cat.id)
               if (receitasCat.length === 0) return null
 
               return (
-                <Card key={cat}>
+                <Card key={cat.id}>
                   <CardHeader>
-                    <CardTitle className="text-lg">{cat}</CardTitle>
+                    <CardTitle className="text-lg capitalize">{cat.nome}</CardTitle>
                   </CardHeader>
 
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {receitasCat.map((receita) => {
-                        const selecionado = itensSelecionados.some(i => i.receitaId === receita.id)
+                        const selecionado = itensSelecionados.find(i => i.receitaId === receita.id)
 
                         return (
                           <div
@@ -225,14 +253,20 @@ export default function CardapioDiaPage() {
                             onClick={() => abrirModalReceita(receita)}
                             className={`
                               p-4 rounded-lg border-2 cursor-pointer transition-all
-                              ${selecionado ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}
+                              ${selecionado 
+                                ? 'border-blue-500 bg-blue-50' 
+                                : 'border-gray-200 hover:border-gray-300'
+                              }
                             `}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{receita.nome}</span>
+                              <span className="font-medium flex items-center gap-2">
+                                <ChefHat className="w-4 h-4" />
+                                {receita.nome}
+                              </span>
 
                               {selecionado && (
-                                <div className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
+                                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
                                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                   </svg>
@@ -240,9 +274,13 @@ export default function CardapioDiaPage() {
                               )}
                             </div>
 
+                            <p className="text-sm text-gray-500 mt-1">
+                              {receita.ingredientes.length} ingredientes • Rende {receita.rendimento} pessoas
+                            </p>
+
                             {selecionado && (
-                              <p className="text-sm text-primary-700 mt-1 font-medium">
-                                {`Rende ${receita.rendimento} • ${receita.ingredientes.length} ingredientes`}
+                              <p className="text-sm text-blue-700 mt-2 font-medium">
+                                Para {selecionado.quantidadePessoas} pessoas
                               </p>
                             )}
                           </div>
@@ -263,51 +301,79 @@ export default function CardapioDiaPage() {
 
               <CardContent>
                 <div className="space-y-4">
-                  <div className="pb-4 border-b">
-                    <p className="text-sm text-gray-500">Para</p>
-                    <p className="text-2xl font-bold text-primary-600">{numeroPessoas} pessoas</p>
-                  </div>
+                  {/* Receitas Selecionadas */}
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">Receitas ({itensSelecionados.length})</p>
+                    {itensSelecionados.length === 0 ? (
+                      <p className="text-gray-400 text-sm">Nenhuma receita selecionada</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {itensSelecionados.map((item) => {
+                          const receita = receitas.find(r => r.id === item.receitaId)
+                          if (!receita) return null
 
-                  {itensSelecionados.length === 0 ? (
-                    <p className="text-gray-400 text-center py-4">Nenhuma receita selecionada</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {itensSelecionados.map((item) => {
-                        const receita = receitas.find(r => r.id === item.receitaId)!
-
-                        return (
-                          <div key={item.receitaId} className="flex justify-between items-center py-2">
-                            <div>
-                              <span className="text-sm font-medium">{receita.nome}</span>
-                              <div className="text-xs text-gray-500">{item.quantidadePessoas} pessoas</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => removerReceitaSelecionada(item.receitaId)}>
-                                Remover
+                          return (
+                            <div key={item.receitaId} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                              <div>
+                                <span className="text-sm font-medium">{receita.nome}</span>
+                                <div className="text-xs text-gray-500">
+                                  {item.quantidadePessoas} pessoas
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => removerReceitaSelecionada(item.receitaId)}
+                              >
+                                <Trash2 className="w-3 h-3 text-red-500" />
                               </Button>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
 
+                  {/* Ingredientes Totais */}
+                  {ingredientesTotais.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-gray-500 mb-2">Ingredientes Totais</p>
+                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                        {ingredientesTotais.map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-gray-700">{item.alimento.nome}</span>
+                            <span className="font-medium">
+                              {formatarQuantidade(item.quantidadeTotal, item.alimento.unidade)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-gray-500">{itensSelecionados.length} itens selecionados</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
+
         {modalReceita && (
           <Modal onClose={() => setModalReceita(null)}>
-            <div>
+            <div className="p-4">
               <h3 className="text-lg font-semibold mb-2">{modalReceita.nome}</h3>
-              <p className="text-sm text-gray-600 mb-4">Quantas pessoas?</p>
-              <Input type="number" value={modalPessoas} onChange={e => setModalPessoas(parseInt(e.target.value || '0'))} />
-              <div className="flex gap-2 mt-4 justify-end">
-                <Button variant="ghost" onClick={() => setModalReceita(null)}>Cancelar</Button>
+              <p className="text-sm text-gray-600 mb-4">
+                Quantas pessoas vão comer esta receita?
+              </p>
+              <Input 
+                type="number" 
+                min="1"
+                value={modalPessoas} 
+                onChange={e => setModalPessoas(parseInt(e.target.value) || 0)} 
+                className="mb-4"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" onClick={() => setModalReceita(null)}>
+                  Cancelar
+                </Button>
                 <Button onClick={confirmarModal}>Confirmar</Button>
               </div>
             </div>
