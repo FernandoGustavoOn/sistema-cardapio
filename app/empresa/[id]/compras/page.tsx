@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 import ComprasClient from './ComprasClient'
 
+export const dynamic = 'force-dynamic'
+
 export default function ComprasPage({ params, searchParams }: { params: { id: string }, searchParams: { mes?: string, ano?: string } }) {
   const empresaId = String(params.id)
   const hoje = new Date()
